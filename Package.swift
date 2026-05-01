@@ -3,21 +3,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "BTXCustomerMessengerKit",
+    name: "BTXClientKit",
     platforms: [
         .iOS(.v17),
     ],
     products: [
         .library(
-            name: "BTXCustomerMessengerKit",
-            targets: ["BTXCustomerMessengerKit"]
+            name: "BTXClientKit",
+            targets: ["BTXClientKit"]
         ),
     ],
     targets: [
         .binaryTarget(
-            name: "BTXCustomerMessengerKit",
-            url: "https://github.com/secondcontext/btx-messenger-ios-sdk/releases/download/0.1.0/BTXCustomerMessengerKit-0.1.0.xcframework.zip",
-            checksum: "878667c6b8ae06eca50959e82c11af269e58efb506d84eef2b2e7aa2aa9c457c"
+            name: "BTXClientKit",
+            url: "https://github.com/secondcontext/btx-messenger-ios-sdk/releases/download/0.2.0/BTXClientKit.xcframework.zip",
+            checksum: "854d5e9e18d34fb4e07049e8acb51d5e54214f35726a9cec0e9c1943b1195935"
         ),
     ]
 )
