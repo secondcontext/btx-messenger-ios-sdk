@@ -1,18 +1,31 @@
-# BTXClientKit
+# BTX iOS SDK
 
-`BTXClientKit` embeds BTX customer messaging and client activity in iOS apps.
+`BTXClientKit` is the BTX iOS SDK for embedding BTX-powered customer conversations, thread context, activity logging, and branded support surfaces inside iOS apps.
 
 The package targets iOS 17 or newer.
 
-Swift Package Manager installs the public package from the GitHub repository, and the package downloads the matching `BTXClientKit` XCFramework for the selected tag. The SDK talks only to BTX-owned HTTP and SSE endpoints. Customer apps do not receive Supabase credentials or vendor-specific realtime configuration.
+The public package is distributed as a Swift Package Manager wrapper around a versioned `BTXClientKit` XCFramework. Host apps only talk to BTX-owned HTTP and SSE endpoints. They do not receive Supabase credentials or vendor-specific realtime configuration.
+
+## What ships today
+
+The SDK currently includes:
+
+- a long-lived `BTXClient` runtime for the current signed-in customer
+- thread list and thread detail sync
+- creating new threads and sending follow-up messages
+- launch-time thread title, intro cards, and hidden thread attributes
+- host-side activity logging
+- image attachments in the built-in composer
+- runtime theming for the customer surface
+- optional APNs push delivery and notification routing
 
 ## Add the package
 
 1. In Xcode, go to `File` then `Add Package Dependencies...`.
-2. Enter `https://github.com/secondcontext/btx-messenger-ios-sdk.git`.
+2. Enter `https://github.com/secondcontext/btx-ios-sdk.git`.
 3. Select `BTXClientKit` and attach the library product to your app target.
 
-Choose the package requirement that matches how you want updates to land in your app. Use an exact version when you want manual control over each SDK upgrade, or choose a semantic-version range when you want Xcode to pick up newer compatible tags inside that rule.
+Choose the package requirement that matches how you want updates to land in your app. Use an exact version when you want manual control over each SDK upgrade, or a semantic-version rule when you want Xcode to pick up newer compatible tags automatically.
 
 ## Configure the client
 
@@ -36,6 +49,11 @@ private let clientConfiguration = BTXClientConfiguration(
             "platform": "ios",
             "bundleId": "com.example.app"
         ]
+    ),
+    theme: BTXClientTheme(
+        backgroundColor: .black,
+        primaryTextColor: .white,
+        secondaryTextColor: Color.white.opacity(0.7)
     )
 )
 
@@ -50,18 +68,23 @@ struct SupportRootView: View {
 
     var body: some View {
         NavigationStack {
-            Button("Open Customer Messages") {
+            Button("Open BTX") {
                 client.present()
             }
         }
-        .btxClient(client, title: "Customer Messages")
+        .btxClient(client, title: "Support")
     }
 }
 ```
 
-Create one long-lived `BTXClient` for the current signed-in user, mount it once per app scene near the app root, then open it from a host-app support or messages entry point with `client.present()`.
+Create one long-lived `BTXClient` for the current signed-in user, mount it once per app scene near the app root, then open it from your host-app entry points with `client.present(...)`.
 
-Recreate the client only when `apiBaseURL`, `appID`, `apiKey`, or `customer.externalID` changes.
+Recreate the client only when one of these changes:
+
+- `apiBaseURL`
+- `appID`
+- `apiKey`
+- `customer.externalID`
 
 The configuration requires:
 
@@ -73,23 +96,91 @@ The configuration requires:
 
 `projectID` is optional and is not required for the standard public SDK integration path.
 
-## Host app responsibilities
+## Open a thread with BTX context
 
-The host app owns:
+Use `BTXLaunchContext` when the host app wants a new thread to open around a known topic:
 
-- the signed-in customer identity
-- app version and build metadata
-- where the user opens Customer Messages from
-- mounting the SDK once per app scene near the app root
-- notification permission and APNs registration
+```swift
+client.present(
+    launchContext: BTXLaunchContext(
+        entryPoint: "order_detail",
+        sourceType: "order",
+        sourceID: "order_123",
+        threadTitle: "Order Support",
+        threadIntro: .card(
+            title: "Ordered on Apr 30",
+            subtitle: "Printing tomorrow",
+            imageURL: "https://cdn.example.com/orders/order-123.jpg"
+        ),
+        threadAttributes: [
+            "user": .object([
+                "id": .string("user_123")
+            ]),
+            "order": .object([
+                "id": .string("order_123"),
+                "status": .string("pending"),
+                "adminURL": .string("https://internal.example.com/orders/order_123")
+            ])
+        ]
+    )
+)
+```
 
-The SDK owns:
+Use launch context when you want BTX to know why the user opened the thread:
 
-- thread bootstrap, creation, append, and refresh calls
-- realtime connection lifecycle
-- local thread and message state
-- foreground reply toasts
-- opening the correct thread after a notification tap
+- `threadTitle` sets the thread title shown in the customer surface
+- `threadIntro` renders customer-visible context at the top of a new thread
+- `threadAttributes` carries hidden structured metadata for the operator side
+
+## Record host-app activity
+
+The SDK can also record customer activity from the host app:
+
+```swift
+client.recordActivity(
+    BTXActivity(
+        kind: "order_detail_viewed",
+        title: "Viewed order detail",
+        detail: "Order 5019c8b5-fc51-4d90-8a4b-46e76fbed2e9",
+        attributes: [
+            "orderId": "5019c8b5-fc51-4d90-8a4b-46e76fbed2e9",
+            "orderStatus": "pending"
+        ]
+    )
+)
+```
+
+Use activity logging for high-signal host events such as:
+
+- viewing an order or account screen
+- launching BTX from a specific flow
+- completing a purchase or support-relevant action
+
+## Theme the customer surface
+
+`BTXClientTheme` lets the host app make the customer messenger feel more native without rebuilding the UI shell:
+
+```swift
+theme: BTXClientTheme(
+    backgroundColor: .black,
+    primaryTextColor: .white,
+    secondaryTextColor: Color.white.opacity(0.7),
+    heroFont: .init(postScriptName: "AwesomeSerif-MediumTall"),
+    titleFont: .init(postScriptName: "BagossStandard-Medium"),
+    bodyFont: .init(postScriptName: "BagossStandard-Regular"),
+    emptyStateLogo: .init(assetName: "EscargotMark"),
+    emptyStateAccentColor: Color.green
+)
+```
+
+The current theming surface covers:
+
+- messenger background
+- key header and empty-state text
+- thread-intro text
+- empty-state logo and accent treatment
+
+The composer layout and chat bubble structure intentionally stay BTX-owned.
 
 ## Image attachments
 
@@ -129,7 +220,7 @@ import UIKit
 import UserNotifications
 
 @MainActor
-func enableCustomerMessagesPush() async {
+func enableBTXPush() async {
     let center = UNUserNotificationCenter.current()
     let granted = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
     guard granted == true else { return }
@@ -137,7 +228,7 @@ func enableCustomerMessagesPush() async {
 }
 ```
 
-Call `await enableCustomerMessagesPush()` once after the host app has a long-lived `BTXClient` for the current signed-in customer.
+Call `await enableBTXPush()` once after the host app has a long-lived `BTXClient` for the current signed-in customer.
 
 ### Forward APNs events into the SDK
 
@@ -147,7 +238,7 @@ import UserNotifications
 import BTXClientKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    var messenger: BTXClient?
+    var client: BTXClient?
 
     func application(
         _ application: UIApplication,
@@ -156,7 +247,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         UNUserNotificationCenter.current().delegate = self
 
         if let remoteNotification = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
-            _ = messenger?.handleLaunchNotification(remoteNotification)
+            _ = client?.handleLaunchNotification(remoteNotification)
         }
 
         return true
@@ -166,9 +257,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
     ) {
-        guard let messenger else { return }
+        guard let client else { return }
         Task {
-            try? await messenger.registerPushDeviceToken(deviceToken)
+            try? await client.registerPushDeviceToken(deviceToken)
         }
     }
 
@@ -177,7 +268,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        if messenger?.handleRemoteNotification(userInfo) == true {
+        if client?.handleRemoteNotification(userInfo) == true {
             completionHandler(.noData)
             return
         }
@@ -190,7 +281,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        if messenger?.handleRemoteNotification(notification.request.content.userInfo) == true {
+        if client?.handleRemoteNotification(notification.request.content.userInfo) == true {
             completionHandler([])
             return
         }
@@ -203,7 +294,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        if messenger?.handleNotificationResponse(response) == true {
+        if client?.handleNotificationResponse(response) == true {
             completionHandler()
             return
         }
