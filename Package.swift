@@ -16,8 +16,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "BTXClientKit",
-            url: "https://github.com/secondcontext/btx-ios-sdk/releases/download/0.3.1/BTXClientKit.xcframework.zip",
-            checksum: "1a41c9383dd64b098e22aa76b0416336c0460dd307724feb509b24476b4802f6"
+            url: "https://github.com/secondcontext/btx-ios-sdk/releases/download/0.3.2/BTXClientKit.xcframework.zip",
+            checksum: "1ebed082f5110d5746a368b167856ea2f07ecf0a71bf2a14d62e611ac6c09511"
         ),
     ]
 )
